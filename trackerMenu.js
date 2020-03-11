@@ -183,7 +183,7 @@ async function menu() {
           first_name: employee.firstName,
           last_name: employee.lastName,
           role_id: employee.roleID,
-          manager_id: employee.manager_id
+          manager_id: employee.manID
         },
         function(err) {
           if (err) throw err;
@@ -207,10 +207,13 @@ async function menu() {
       menu();
       break;
     case "View Employees":
-      connection.query("SELECT * FROM employee", function(err, res) {
-        if (err) throw err;
-        console.table(res);
-      });
+      connection.query(
+        "SELECT m.id, m.first_name,m.last_name, e.first_name AS Manager, r.title AS Position, d.dept_name AS Department, r.salary FROM employee e INNER JOIN employee m ON m.manager_id = e.id LEFT JOIN role r ON r.id = e.role_id LEFT JOIN department d ON d.id = r.department_id",
+        function(err, res) {
+          if (err) throw err;
+          console.table(res);
+        }
+      );
       menu();
       break;
     case "Update Employee":
@@ -218,19 +221,39 @@ async function menu() {
         if (err) throw err;
         const choiceArray = [];
         res.map(employee => choiceArray.push(employee.first_name));
-        const choice = inquirer.prompt({
-          name: "employee",
-          type: "list",
-          choices: choiceArray,
-          message: "What employee would you like to update?"
-        });
-        connection.query(
-          "SELECT * FROM employee WHERE first_name ===" + choice.employee,
-          function(err, res) {
-            if (err) throw err;
-            console.table(res);
-          }
-        );
+        inquirer
+          .prompt({
+            name: "employee",
+            type: "list",
+            choices: choiceArray,
+            message: "What employee would you like to update?"
+          })
+          .then(function(response) {
+            connection.query(
+              `SELECT * FROM employee WHERE first_name = '${response.employee}'`,
+              async function(err, res) {
+                if (err) throw err;
+                console.table(res);
+                inquirer
+                  .prompt({
+                    name: "roleUpdate",
+                    type: "number",
+                    message: "What is the new role ID?"
+                  })
+                  .then(function(update) {
+                    connection.query(
+                      `UPDATE employee SET ? WHERE first_name = '${response.employee}'`,
+                      { role_id: update.roleUpdate },
+                      function(err, res) {
+                        if (err) throw err;
+                        console.log("Employee role was updated!");
+                        menu();
+                      }
+                    );
+                  });
+              }
+            );
+          });
       });
       break;
   }
